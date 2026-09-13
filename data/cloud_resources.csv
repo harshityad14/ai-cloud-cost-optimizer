@@ -1,0 +1,13 @@
+resource_name,resource_type,current_config,monthly_cost,avg_cpu_percent,avg_memory_percent,monthly_hours,vcpu,memory_gb
+web-server-01,vm_instance,e2-standard-4,98.11,12.0,18.5,730,4,16
+web-server-02,vm_instance,e2-standard-4,98.11,72.3,65.0,730,4,16
+api-backend-01,vm_instance,e2-standard-8,196.22,45.8,52.3,730,8,32
+api-backend-02,vm_instance,e2-standard-8,196.22,8.5,11.2,730,8,32
+db-primary,cloud_sql,db-n1-standard-4,281.78,55.0,70.1,730,4,15
+db-replica-01,cloud_sql,db-n1-standard-4,281.78,5.2,15.8,730,4,15
+cache-server-01,memorystore,basic-m5,357.70,10.0,22.5,730,4,35
+batch-worker-01,vm_instance,e2-standard-2,49.06,85.0,60.0,730,2,8
+staging-server,vm_instance,e2-standard-4,26.88,3.1,7.4,200,4,16
+dev-test-server,vm_instance,e2-standard-2,23.52,6.0,9.8,350,2,8
+analytics-vm,vm_instance,e2-standard-8,196.22,62.5,48.0,730,8,32
+load-balancer-01,load_balancer,lb-small,18.25,15.0,10.0,730,1,2
