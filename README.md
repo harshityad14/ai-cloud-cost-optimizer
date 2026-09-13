@@ -39,7 +39,7 @@ The repository currently implements **Stage 2 (Local Cost Analysis)** and **Stag
 - **Local CSV Ingestion**: Type-safe loading of cloud resource metrics and configuration catalogs without third-party dependencies.
 - **Multi-Metric Underutilization Filtering**: Flags resources where *both* average CPU utilization (< 20%) and average memory utilization (< 30%) indicate chronic over-provisioning.
 - **Safety-Margin Capacity Sizing**: Converts percentage utilization into required vCPU and memory dimensions with configurable headroom multipliers.
-- **Catalog-Driven Downsizing Search**: Deterministically filters catalog entries by resource type, minimum required specifications, cost savings, and specification divergence.
+- **Catalog-Driven Downsizing Search**: Deterministically filters catalog entries by resource type, minimum required specifications, and cost savings.
 - **Identical-Specification Rejection**: Enforces validation guards preventing recommendations of identical vCPU/memory configurations that merely reflect catalog discrepancies.
 - **Unified Pricing Model**: Derives current resource spend and candidate costs from the identical catalog pricing source using standardized monthly hours.
 - **Comprehensive Test Suite**: Automated regression and validation tests enforcing data integrity, pricing model alignment, sizing math, and documentation accuracy.
@@ -52,35 +52,13 @@ The current system is structured as a modular, local data processing pipeline us
 
 ```mermaid
 flowchart TD
-    subgraph Data Layer
-        A[cloud_resources.csv<br/>Observed Usage & Specs]
-        B[resource_catalog.csv<br/>Pricing & Specs Tiers]
-    end
-
-    subgraph Cost Analyzer (Stage 2)
-        C[load_resources] --> D[Utilization Aggregator]
-        D --> E{find_underutilized<br/>CPU < 20% & Mem < 30%}
-    end
-
-    subgraph Optimization Engine (Stage 3)
-        F[calculate_required_resources<br/>Usage x Current Specs x 1.5x Headroom]
-        G[find_best_candidate<br/>Type Match + Specs Gate + Cheaper Gate]
-        H[get_current_resource_cost<br/>Derived from Catalog Rates]
-        I[build_recommendation<br/>Savings Math & Explanation]
-    end
-
-    subgraph Reporting Layer
-        J[Console Optimization Report<br/>Resource-by-Resource Breakdown]
-    end
-
-    A --> C
-    B --> G
-    B --> H
-    E -->|Flagged Resources| F
-    F --> G
-    H --> G
-    G --> I
-    I --> J
+    A["cloud_resources.csv"] --> B["Cost Analyzer"]
+    B --> C["Underutilization Detection"]
+    C --> D["Optimization Engine"]
+    D --> E["Resource Recommendation"]
+    E --> F["Savings Estimation"]
+    G["resource_catalog.csv"] --> D
+    F --> H["Console Report"]
 ```
 
 ---
@@ -91,18 +69,22 @@ The optimization engine implements a deterministic, 6-step heuristic:
 
 1. **Underutilization Detection**:
    A resource is flagged as underutilized if and only if both average metrics fall below heuristic thresholds:
-   $$\text{avg\_cpu\_percent} < 20.0\% \quad \land \quad \text{avg\_memory\_percent} < 30.0\%$$
+   ```text
+   avg_cpu_percent < 20.0% AND avg_memory_percent < 30.0%
+   ```
 
 2. **Workload Sizing with Safety Headroom**:
-   Translates observed percentages into minimum required hardware specifications while provisioning 50% headroom ($\text{SAFETY\_MARGIN} = 1.5$):
-   $$\text{required\_vcpu} = \left(\frac{\text{avg\_cpu\_percent}}{100}\right) \times \text{current\_vcpu} \times 1.5$$
-   $$\text{required\_memory\_gb} = \left(\frac{\text{avg\_memory\_percent}}{100}\right) \times \text{current\_memory\_gb} \times 1.5$$
+   Translates observed utilization percentages into minimum required hardware specifications while provisioning 50% headroom (`SAFETY_MARGIN = 1.5`):
+   ```text
+   required_vcpu = (avg_cpu_percent / 100) × current_vcpu × 1.5
+   required_memory_gb = (avg_memory_percent / 100) × current_memory_gb × 1.5
+   ```
 
 3. **Candidate Filtering & Validation**:
    Filters candidate configurations from `data/resource_catalog.csv` satisfying all constraints:
    - **Type Equality**: `candidate.resource_type == resource.resource_type`
    - **Capacity Sufficiency**: `candidate.vcpu >= required_vcpu` and `candidate.memory_gb >= required_memory_gb`
-   - **Specification Divergence**: Candidates with identical vCPU *and* memory to current specs are explicitly excluded to prevent false downsizes.
+   - **Specification Divergence**: Candidates with identical vCPU and memory to current specifications are excluded to prevent false downsizes.
    - **Identity Exclusion**: `candidate.config_name != resource.current_config`
 
 4. **Selection of Cheapest Viable Configuration**:
@@ -110,13 +92,19 @@ The optimization engine implements a deterministic, 6-step heuristic:
 
 5. **Strict Cost Reduction Gate**:
    Both current and candidate monthly costs are derived from catalog rates:
-   $$\text{monthly\_cost} = \text{round}(\text{hourly\_cost} \times \text{monthly\_hours}, 2)$$
+   ```text
+   monthly_cost = round(hourly_cost × monthly_hours, 2)
+   ```
    A candidate is accepted only if:
-   $$\text{recommended\_monthly\_cost} < \text{current\_monthly\_cost}$$
+   ```text
+   recommended_monthly_cost < current_monthly_cost
+   ```
 
 6. **Financial Estimation**:
-   $$\text{estimated\_monthly\_savings} = \text{round}(\text{current\_monthly\_cost} - \text{recommended\_monthly\_cost}, 2)$$
-   $$\text{estimated\_savings\_percent} = \left(\frac{\text{estimated\_monthly\_savings}}{\text{current\_monthly\_cost}}\right) \times 100$$
+   ```text
+   estimated_monthly_savings = round(current_monthly_cost - recommended_monthly_cost, 2)
+   estimated_savings_percent = (estimated_monthly_savings / current_monthly_cost) × 100
+   ```
 
 ---
 
@@ -279,7 +267,7 @@ The project is being developed in iterative milestones:
 - [x] **Stage 3: Rule-Based Optimization Engine**: Implemented resource sizing with safety margin, catalog search, unified pricing derivation, and comprehensive regression test suites.
 
 ### Planned Stages *(Not Yet Implemented)*
-- [ ] **Stage 4: Google Cloud Platform (GCP) Integration**: Connect to live GCP Cloud Monitoring (CloudWatch / Monitoring API) and Cloud Billing BigQuery export. *(Planned)*
+- [ ] **Stage 4: Google Cloud Platform (GCP) Integration**: Connect to live Google Cloud Monitoring API and Cloud Billing BigQuery export. *(Planned)*
 - [ ] **Stage 5: Time-Series Workload Forecasting & Anomaly Detection**: Incorporate machine learning models (e.g., ARIMA, Prophet, LSTM) to forecast traffic spikes and identify usage anomalies before downsizing. *(Planned)*
 - [ ] **Stage 6: Advanced Multi-Factor Optimization**: Factor in disk IOPS, network egress bandwidth, GPU requirements, and regional pricing differences. *(Planned)*
 - [ ] **Stage 7: GenAI-Powered Recommendations & Explanations**: Integrate LLM APIs (e.g., Google Gemini) to generate natural-language executive summaries, architectural advice, and contextual risk assessments. *(Planned)*
@@ -310,9 +298,3 @@ Beyond static threshold matching, intelligent cloud cost optimization requires u
 - **Harshit Yadav**
 - GitHub: [@harshityad14](https://github.com/harshityad14)
 - Repository: [ai-cloud-cost-optimizer](https://github.com/harshityad14/ai-cloud-cost-optimizer)
-
----
-
-## License
-
-This repository is currently under active development. All rights reserved. Formal open-source licensing will be added in a future release.
